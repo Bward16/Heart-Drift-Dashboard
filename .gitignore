@@ -1,0 +1,9 @@
+data/raw/
+data/*.csv
+reports/*.html
+reports/*.json
+reports/model.pkl
+__pycache__/
+*.pyc
+.venv/
+.DS_Store
