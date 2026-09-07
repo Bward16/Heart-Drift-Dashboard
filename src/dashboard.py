@@ -4,13 +4,16 @@ Run monitor.py first to generate reports/<site>.json + .html, then:
     streamlit run src/dashboard.py
 """
 
-import json
-
 import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as components
 
-SITES = ("hungarian", "switzerland", "va")
+from drift_report import (
+    SITES,
+    extract_classification_accuracy,
+    extract_drift_summary,
+    extract_feature_drift_table,
+    load_report_json,
+)
 
 FEATURE_GLOSSARY = {
     "age": "Age (years)",
@@ -32,7 +35,7 @@ FEATURE_GLOSSARY = {
 
 DRIFT_GLOSSARY = {
     "Stattest": "The statistical test Evidently auto-selected for that column (e.g. Kolmogorov-Smirnov for numeric, chi-squared for categorical).",
-    "Drift score": "The p-value (or distance metric) from that test. A column is flagged drifted once its score crosses the test's threshold.",
+    "Drift score": "The p-value from that test. Lower means stronger evidence that the distribution changed; a column is flagged drifted once the p-value falls below the test's significance level (0.05 by default).",
     "Dataset drift": "Evidently's overall flag for the site: True once more than half of columns are individually flagged as drifted.",
     "Current accuracy": "How often the model's prediction matches the true target at that site — only available here because every UCI site happens to have labels.",
 }
@@ -53,50 +56,12 @@ with st.expander("What do these columns and terms mean?"):
 
 
 @st.cache_data
-def load_report_json(site: str) -> dict:
-    with open(f"reports/{site}.json") as f:
-        return json.load(f)
-
-
-def extract_drift_summary(report: dict) -> dict:
-    for metric in report["metrics"]:
-        if metric["metric"] == "DataDriftTable":
-            result = metric["result"]
-            return {
-                "n_drifted": result["number_of_drifted_columns"],
-                "n_features": result["number_of_columns"],
-                "share_drifted": result["share_of_drifted_columns"],
-                "dataset_drift": result["dataset_drift"],
-            }
-    return {}
-
-
-def extract_feature_drift_table(report: dict) -> pd.DataFrame:
-    for metric in report["metrics"]:
-        if metric["metric"] == "DataDriftTable":
-            per_column = metric["result"]["drift_by_columns"]
-            rows = [
-                {
-                    "feature": name,
-                    "drift_detected": info["drift_detected"],
-                    "stattest": info.get("stattest_name"),
-                    "score": info.get("drift_score"),
-                }
-                for name, info in per_column.items()
-            ]
-            return pd.DataFrame(rows).sort_values("score", ascending=False)
-    return pd.DataFrame()
-
-
-def extract_classification_accuracy(report: dict) -> float | None:
-    for metric in report["metrics"]:
-        if metric["metric"] == "ClassificationQualityMetric":
-            return metric["result"]["current"]["accuracy"]
-    return None
+def cached_report(site: str) -> dict:
+    return load_report_json(site)
 
 
 site = st.sidebar.selectbox("Site (vs. Cleveland reference)", SITES)
-report = load_report_json(site)
+report = cached_report(site)
 
 summary = extract_drift_summary(report)
 accuracy = extract_classification_accuracy(report)
@@ -108,16 +73,12 @@ col3.metric("Dataset drift flagged", "Yes" if summary.get("dataset_drift") else 
 col4.metric("Current accuracy", f"{accuracy:.2%}" if accuracy is not None else "—")
 
 st.subheader("Per-feature drift")
+st.caption("Drifted features first, then by p-value ascending, so the strongest evidence of drift is at the top.")
 st.dataframe(extract_feature_drift_table(report), use_container_width=True)
 
 st.subheader("Accuracy across all sites")
 accuracy_rows = []
 for s in SITES:
-    r = load_report_json(s)
-    a = extract_classification_accuracy(r)
+    a = extract_classification_accuracy(cached_report(s))
     accuracy_rows.append({"site": s, "accuracy": a})
 st.bar_chart(pd.DataFrame(accuracy_rows).set_index("site"))
-
-st.subheader("Full Evidently report")
-with open(f"reports/{site}.html") as f:
-    components.html(f.read(), height=800, scrolling=True)

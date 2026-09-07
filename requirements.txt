@@ -5,3 +5,4 @@ evidently>=0.4,<0.5
 streamlit>=1.30
 requests>=2.31
 joblib>=1.3
+pytest>=8.0
