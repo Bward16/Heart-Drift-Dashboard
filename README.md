@@ -14,9 +14,15 @@ real distributional shift instead of synthetic noise.
 - **Dashboard**: Streamlit, reads pre-computed Evidently JSON/HTML snapshots rather than recomputing on page load — mirrors how real monitoring separates the batch job from the UI.
 
 Because labels exist for every site here, the dashboard also tracks model
-performance decay (accuracy) per site alongside drift — most real production
+classification accuracy per site alongside drift — most real production
 dashboards only have the drift side, since labels lag. Worth calling out as a
 simplification if you present this.
+
+## Evaluation limitation
+
+Cleveland predictions are currently generated on the same rows used to fit the model. Its accuracy is in-sample and must not be treated as a held-out baseline. Cross-site accuracy differences do not by themselves establish a causal effect of drift. A reproducible held-out evaluation is planned; existing reports retain their original methodology.
+
+Run `pytest` to verify report extraction and ordering. The dashboard also provides the full HTML reports for inspection and download.
 
 ## Reference
 

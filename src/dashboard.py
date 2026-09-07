@@ -4,6 +4,9 @@ Run monitor.py first to generate reports/<site>.json + .html, then:
     streamlit run src/dashboard.py
 """
 
+from pathlib import Path
+
+import streamlit.components.v1 as components
 import pandas as pd
 import streamlit as st
 
@@ -61,7 +64,11 @@ def cached_report(site: str) -> dict:
 
 
 site = st.sidebar.selectbox("Site (vs. Cleveland reference)", SITES)
-report = cached_report(site)
+try:
+    report = cached_report(site)
+except FileNotFoundError:
+    st.info("Reports are not available yet. Run ingest.py, train.py, and monitor.py to generate them.")
+    st.stop()
 
 summary = extract_drift_summary(report)
 accuracy = extract_classification_accuracy(report)
@@ -82,3 +89,20 @@ for s in SITES:
     a = extract_classification_accuracy(cached_report(s))
     accuracy_rows.append({"site": s, "accuracy": a})
 st.bar_chart(pd.DataFrame(accuracy_rows).set_index("site"))
+
+
+st.caption(
+    "Cleveland reference predictions are in-sample: the model was trained on those same rows. "
+    "Reference accuracy is not a held-out baseline. Cross-site accuracy differences alone "
+    "do not establish that drift caused a performance change."
+)
+
+st.subheader("Full Evidently report")
+report_path = Path("reports") / f"{site}.html"
+if report_path.exists():
+    report_html = report_path.read_text(encoding="utf-8")
+    st.download_button("Download full report", report_html, file_name=f"{site}.html", mime="text/html")
+    with st.expander("View full report"):
+        components.html(report_html, height=800, scrolling=True)
+else:
+    st.info("The HTML report is missing. Run monitor.py to regenerate it.")
