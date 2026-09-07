@@ -114,4 +114,7 @@ heart-drift-dashboard/
 
 ## License
 
-[MIT](LICENSE)
+Licensed under the [Apache License 2.0](LICENSE).
+
+Releases up to and including commit `13bc7d8` were published under the MIT
+license and remain available under those terms.
